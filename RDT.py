@@ -94,26 +94,57 @@ class RDT:
         #rdt_send(data)
         #sndpkt = make_pkt(count,data,checksum)
         #udt_send(sndpkt)
+        p = Packet(self.seq_num, msg_S)
+        self.network.udt_send(p.get_byte_S())
         
         #while(rcvpkt corrupt or isNAK)
         #rdt_rcv(rcvpkt) and (corrupt(rcvpkt) || isNAK(rcvpkt))
         #udt_send(sendpkt)
+        byte_S = self.network.udt_receive()
+        msg_S = byte_S[Packet.seq_num_S_length+Packet.seq_num_S_length+Packet.checksum_length :]
 
+        while(corrupt(byte_S) or msg_S == "NAK"):
+            #resend the message
+            p = Packet(self.seq_num, msg_S)
+            self.network.udt_send(p.get_byte_S)
+            byte_S = self.network.udt_receive()
+            msg_S = byte_S[Packet.seq_num_S_length+Packet.seq_num_S_length+Packet.checksum_length :]
         #now it's not corrupt
-        #rdt_rcv(rcvpkt) 
 
-        #modify the count so that the orders work out
-        #if count == 0: count = 1
-        #else count = 0
-        pass
+        #inc sequence number
+        self.seq_num += 1
         
     def rdt_2_1_receive(self):
+        byte_S = self.network.udt_receive()
+        if not corrupt(byte_S):
+            seq_num_S = byte_S[Packet.length_S_length : Packet.seq_num_S_length+Packet.seq_num_S_length]
+            if seq_num_S == self.seq_num:
+                #send the ack
+                p = Packet(self.seq_num, "ACK")
+                self.network.udt_send(p.get_byte_S)
+                #handle getting the content out of the buffer
+                self.byte_buffer += byte_S
+                while True:
+                    if(len(self.byte_buffer) < Packet.length_S_length):
+                        return ret_S 
+                    length = int(self.byte_buffer[:Packet.length_S_length])
+                    if len(self.byte_buffer) < length:
+                        return ret_S 
+                    p = Packet.from_byte_S(self.byte_buffer[0:length])
+                    ret_S = p.msg_S if (ret_S is None) else ret_S + p.msg_S
+                    self.byte_buffer = self.byte_buffer[length:]
+
+                #increment the seq number
+                self.seq_num+=1
+
         #rdt_rcv(rcvpkt) && !corrupt(rcvpkt) && get_seq_num(rcvpkt)==count
         #then data = extract(packet)
         #deliver_data(data)
         #sndpkt = make_pkt(ACK,chksum)
         #udt_sent(sndpkt)
-
+        else:
+            p = Packet(self.seq_num, "NAK")
+            self.network.udt_send(p.get_byte_S)
         #while rdt_rcv(rcvpkt) && corrupt
         #sndpkt = make_pkt(NAK, chksum)
         #udt_send(sndpkt)
