@@ -37,19 +37,19 @@ class Packet:
         return length_S + seq_num_S + checksum_S + self.msg_S
    
     
-    @staticmethod
-    def corrupt(byte_S):
-        #extract the fields
-        length_S = byte_S[0:Packet.length_S_length]
-        seq_num_S = byte_S[Packet.length_S_length : Packet.seq_num_S_length+Packet.seq_num_S_length]
-        checksum_S = byte_S[Packet.seq_num_S_length+Packet.seq_num_S_length : Packet.seq_num_S_length+Packet.length_S_length+Packet.checksum_length]
-        msg_S = byte_S[Packet.seq_num_S_length+Packet.seq_num_S_length+Packet.checksum_length :]
+
+def corrupt(byte_S):
+    #extract the fields
+    length_S = byte_S[0:Packet.length_S_length]
+    seq_num_S = byte_S[Packet.length_S_length : Packet.seq_num_S_length+Packet.seq_num_S_length]
+    checksum_S = byte_S[Packet.seq_num_S_length+Packet.seq_num_S_length : Packet.seq_num_S_length+Packet.length_S_length+Packet.checksum_length]
+    msg_S = byte_S[Packet.seq_num_S_length+Packet.seq_num_S_length+Packet.checksum_length :]
         
-        #compute the checksum locally
-        checksum = hashlib.md5(str(length_S+seq_num_S+msg_S).encode('utf-8'))
-        computed_checksum_S = checksum.hexdigest()
-        #and check if the same
-        return checksum_S != computed_checksum_S
+    #compute the checksum locally
+    checksum = hashlib.md5(str(length_S+seq_num_S+msg_S).encode('utf-8'))
+    computed_checksum_S = checksum.hexdigest()
+    #and check if the same
+    return checksum_S != computed_checksum_S
         
 
 class RDT:
@@ -101,14 +101,14 @@ class RDT:
         #rdt_rcv(rcvpkt) and (corrupt(rcvpkt) || isNAK(rcvpkt))
         #udt_send(sendpkt)
         byte_S = self.network.udt_receive()
-        msg_S = byte_S[Packet.seq_num_S_length+Packet.seq_num_S_length+Packet.checksum_length :]
+        msg_R = byte_S[Packet.seq_num_S_length+Packet.seq_num_S_length+Packet.checksum_length :]
 
-        while(corrupt(byte_S) or msg_S == "NAK"):
+        while(corrupt(byte_S) or msg_R == "NAK"):
             #resend the message
             p = Packet(self.seq_num, msg_S)
-            self.network.udt_send(p.get_byte_S)
+            self.network.udt_send(p.get_byte_S())
             byte_S = self.network.udt_receive()
-            msg_S = byte_S[Packet.seq_num_S_length+Packet.seq_num_S_length+Packet.checksum_length :]
+            msg_R = byte_S[Packet.seq_num_S_length+Packet.seq_num_S_length+Packet.checksum_length :]
         #now it's not corrupt
 
         #inc sequence number
@@ -121,7 +121,7 @@ class RDT:
             if seq_num_S == self.seq_num:
                 #send the ack
                 p = Packet(self.seq_num, "ACK")
-                self.network.udt_send(p.get_byte_S)
+                self.network.udt_send(p.get_byte_S())
                 #handle getting the content out of the buffer
                 self.byte_buffer += byte_S
                 while True:
@@ -144,7 +144,7 @@ class RDT:
         #udt_sent(sndpkt)
         else:
             p = Packet(self.seq_num, "NAK")
-            self.network.udt_send(p.get_byte_S)
+            self.network.udt_send(p.get_byte_S())
         #while rdt_rcv(rcvpkt) && corrupt
         #sndpkt = make_pkt(NAK, chksum)
         #udt_send(sndpkt)
@@ -155,7 +155,6 @@ class RDT:
 
         #if count == 0: count = 1
         #else count = 0
-        pass
     
     def rdt_3_0_send(self, msg_S):
         pass
