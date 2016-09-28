@@ -2,7 +2,7 @@ import Network
 import argparse
 from time import sleep
 import hashlib
-
+import time
 
 class Packet:
     ## the number of bytes used to store packet length
@@ -37,19 +37,19 @@ class Packet:
         return length_S + seq_num_S + checksum_S + self.msg_S
    
     
-
-def corrupt(byte_S):
-    #extract the fields
-    length_S = byte_S[0:Packet.length_S_length]
-    seq_num_S = byte_S[Packet.length_S_length : Packet.seq_num_S_length+Packet.seq_num_S_length]
-    checksum_S = byte_S[Packet.seq_num_S_length+Packet.seq_num_S_length : Packet.seq_num_S_length+Packet.length_S_length+Packet.checksum_length]
-    msg_S = byte_S[Packet.seq_num_S_length+Packet.seq_num_S_length+Packet.checksum_length :]
+    @staticmethod
+    def corrupt(byte_S):
+    
+        length_S = byte_S[0:Packet.length_S_length]
+        seq_num_S = byte_S[Packet.length_S_length : Packet.seq_num_S_length+Packet.seq_num_S_length]
+        checksum_S = byte_S[Packet.seq_num_S_length+Packet.seq_num_S_length : Packet.seq_num_S_length+Packet.length_S_length+Packet.checksum_length]
+        msg_S = byte_S[Packet.seq_num_S_length+Packet.seq_num_S_length+Packet.checksum_length :]
         
-    #compute the checksum locally
-    checksum = hashlib.md5(str(length_S+seq_num_S+msg_S).encode('utf-8'))
-    computed_checksum_S = checksum.hexdigest()
-    #and check if the same
-    return checksum_S != computed_checksum_S
+    
+        checksum = hashlib.md5(str(length_S+seq_num_S+msg_S).encode('utf-8'))
+        computed_checksum_S = checksum.hexdigest()
+
+        return checksum_S != computed_checksum_S
         
 
 class RDT:
@@ -103,10 +103,13 @@ class RDT:
         byte_S = self.network.udt_receive()
         msg_R = byte_S[Packet.seq_num_S_length+Packet.seq_num_S_length+Packet.checksum_length :]
 
-        while(corrupt(byte_S) or msg_R == "NAK"):
+
+        while(Packet.corrupt(byte_S) or msg_R == "NAK"):
             #resend the message
+            print "RESENDING"
             p = Packet(self.seq_num, msg_S)
             self.network.udt_send(p.get_byte_S())
+            time.sleep(1)
             byte_S = self.network.udt_receive()
             msg_R = byte_S[Packet.seq_num_S_length+Packet.seq_num_S_length+Packet.checksum_length :]
         #now it's not corrupt
@@ -116,8 +119,9 @@ class RDT:
         
     def rdt_2_1_receive(self):
         byte_S = self.network.udt_receive()
-        if not corrupt(byte_S):
-            seq_num_S = byte_S[Packet.length_S_length : Packet.seq_num_S_length+Packet.seq_num_S_length]
+        ret_S = None
+        if not Packet.corrupt(byte_S):
+            seq_num_S = int(byte_S[Packet.length_S_length : Packet.seq_num_S_length+Packet.seq_num_S_length])
             if seq_num_S == self.seq_num:
                 #send the ack
                 p = Packet(self.seq_num, "ACK")
