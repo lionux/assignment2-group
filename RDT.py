@@ -116,6 +116,7 @@ class RDT:
                     p = Packet.from_byte_S(self.byte_buffer[0:length])
                     ret_S = p.msg_S if (ret_S is None) else ret_S + p.msg_S
                     self.byte_buffer = self.byte_buffer[length:]
+
             #We retransmit
             if ret_S != "ACK" or Packet.corrupt(byte_S):
                 p = Packet(self.seq_num, msg_S)
