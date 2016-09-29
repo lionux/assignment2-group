@@ -108,6 +108,50 @@ class RDT:
                 byte_S = self.network.udt_receive()
                 self.byte_buffer += byte_S
                 while True:
+                    if not Packet.corrupt(self.byte_buffer):
+                        if(len(self.byte_buffer) < Packet.length_S_length):
+                            break
+                        length = int(self.byte_buffer[:Packet.length_S_length])
+                        if len(self.byte_buffer) < length:
+                            break
+                        p = Packet.from_byte_S(self.byte_buffer[0:length]) 
+                        ret_S = p.msg_S if (ret_S is None) else ret_S + p.msg_S
+                        self.byte_buffer = self.byte_buffer[length:]
+                    else:
+                        if(len(self.byte_buffer) < Packet.length_S_length):
+                            break
+                        ret_S = "NAK"
+                        byte_S = self.byte_buffer
+                        break
+            print (ret_S)
+            if not Packet.corrupt(byte_S) and ret_S is not "NAK":
+                if self.seq_num == Packet.get_seq_num(byte_S):
+                    self.seq_num += 1
+                    break
+                else:
+                    self.seq_num = Packet.get_seq_num(byte_S)
+                    p = Packet(self.seq_num, "NAK")
+                    self.network.udt_send(p.get_byte_S())
+                    break
+            else:
+                print(str(self.seq_num) + " msg: "+msg_S)
+                print("Problem with packet, retransmitting from send")
+                p = Packet(self.seq_num, msg_S)
+                self.network.udt_send(p.get_byte_S())
+                time.sleep(1)
+
+        time.sleep(1)
+
+
+    def rdt_2_1_receive(self):
+        ret_S = None
+        byte_S = None
+        while ret_S is None:
+            byte_S = self.network.udt_receive()
+            print("BYTE_S: "+byte_S)
+            self.byte_buffer += byte_S
+            while True:
+                if not Packet.corrupt(self.byte_buffer):
                     if(len(self.byte_buffer) < Packet.length_S_length):
                         break
                     length = int(self.byte_buffer[:Packet.length_S_length])
@@ -116,45 +160,22 @@ class RDT:
                     p = Packet.from_byte_S(self.byte_buffer[0:length])
                     ret_S = p.msg_S if (ret_S is None) else ret_S + p.msg_S
                     self.byte_buffer = self.byte_buffer[length:]
-
-            #We retransmit
-            if ret_S != "ACK" or Packet.corrupt(byte_S):
-                p = Packet(self.seq_num, msg_S)
-                self.network.udt_send(p.get_byte_S())
-            else:
-                break
-        self.seq_num += 1
-
-    def rdt_2_1_receive(self):
-        ret_S = None
-        byte_S = None
-        while ret_S is None:
-            byte_S = self.network.udt_receive()
-            self.byte_buffer += byte_S
-            while True:
-                if(len(self.byte_buffer) < Packet.length_S_length):
+                else:
+                    if(len(self.byte_buffer) < Packet.length_S_length):
+                        break
+                    byte_S = self.byte_buffer
+                    ret_S = "NAK"
                     break
-                length = int(self.byte_buffer[:Packet.length_S_length])
-                if len(self.byte_buffer) < length:
-                    break
-                p = Packet.from_byte_S(self.byte_buffer[0:length])
-                ret_S = p.msg_S if (ret_S is None) else ret_S + p.msg_S
-                self.byte_buffer = self.byte_buffer[length:]
-
-        if not Packet.corrupt(byte_S) and self.seq_num == Packet.get_seq_num(byte_S):
-            #print ("OUR SEQ NUM: "+str(self.seq_num)+" THEIRS: "+str(Packet.get_seq_num(byte_S)))
+                
+        if ret_S is not "NAK":
             p = Packet(self.seq_num, "ACK")
             self.network.udt_send(p.get_byte_S())
-            #self.seq_num += 1
-        elif not Packet.corrupt(byte_S):
-            #print ("OUR SEQ NUM: "+str(self.seq_num)+" THEIRS: "+str(Packet.get_seq_num(byte_S)))
-            #self.seq_num = Packet.get_seq_num(byte_S)
-            p = Packet(self.seq_num, "ACK")
-            self.network.udt_send(p.get_byte_S())
-            #self.seq_num += 1
         else:
+            print(str(self.seq_num)+" msg: "+"NAK")
+            print("Packet from sender is corrupt, sending NAK")
             p = Packet(self.seq_num, "NAK")
             self.network.udt_send(p.get_byte_S())
+            time.sleep(1)
             return None
         time.sleep(1)
         return ret_S
