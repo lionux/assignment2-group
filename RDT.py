@@ -122,20 +122,23 @@ class RDT:
                         break
             #print("got ret_S in send method: "+ret_S+"."+str(ret_S == "ACK"))
             if ret_S == "CORRUPT" or ret_S == "NAK":
+                print ("Receiver got corrupt packet, resending from SEND "+msg_S)
                 p = Packet(self.seq_num, msg_S)
                 self.network.udt_send(p.get_byte_S())
                 time.sleep(1)
             elif ret_S == "ACK":
-                    self.seq_num += 1
-                    #print("receieved ack on send, breaking")
-                    break
+                print ("Receiver got a good packet, received ACK on SEND")
+                self.seq_num += 1
+                #print("receieved ack on send, breaking")
+                break
             #we need to ask them to retransmit (we got the next message)
             else:
+                print("We got a packet out of order, ask for a resend")
                 p = Packet(self.seq_num, "NAK")
                 self.network.udt_send(p.get_byte_S())
                 break
 
-
+        print("ENDING SEND FUNC\n\n")
         time.sleep(1)
 
 
@@ -159,15 +162,18 @@ class RDT:
                 except Exception as e:
                     ret_S = "CORRUPT"
                     break
-                
-        if ret_S is not "CORRUPT":
+    
+        if ret_S != "CORRUPT":
+            print ("Got good packet in RECV, send ACK")
             p = Packet(self.seq_num, "ACK")
             self.network.udt_send(p.get_byte_S())
             time.sleep(1)
             return ret_S
+        elif ret_S == "ACK":
+            return None
         else:
             #print(str(self.seq_num)+" msg: "+"NAK")
-            #print("Packet from sender is corrupt, sending NAK")
+            print("Packet from sender is corrupt, sending NAK")
             p = Packet(self.seq_num, "NAK")
             self.network.udt_send(p.get_byte_S())
             time.sleep(1)
