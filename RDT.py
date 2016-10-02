@@ -102,7 +102,7 @@ class RDT:
     
     def rdt_2_1_send(self, msg_S):
         self.retransmit_MSG = msg_S #reassign the retransimit message to the current one
-        p = Packet(self.seq_num, self.seq_num, msg_S)
+        p = Packet(0, self.seq_num, msg_S)
         self.network.udt_send(p.get_byte_S())
         
     def rdt_2_1_receive(self):
@@ -111,8 +111,8 @@ class RDT:
         p_type = None
         p_seq = None
         corrupt = False
-
         byte_S = self.network.udt_receive()
+        #print("RECEIVED PACKET: "+str(byte_S))
         self.byte_buffer += byte_S
         while True:
             try:
