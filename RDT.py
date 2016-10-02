@@ -62,7 +62,8 @@ class RDT:
     #note that for 2_1 this is used as the recv state (it's either 0 or 1)
     seq_num = 0
     #the NAK send state (either 0 or 1), for 2_1
-    send_state = 0
+    our_send_state = 0
+    other_send_state = 0
     ## buffer of bytes read from network
     byte_buffer = '' 
     retransmit_MSG = '' 
@@ -104,6 +105,7 @@ class RDT:
         self.retransmit_MSG = msg_S #reassign the retransimit message to the current one
         p = Packet(0, self.seq_num, msg_S)
         self.network.udt_send(p.get_byte_S())
+        sleep(1)
         
     def rdt_2_1_receive(self):
         ret_S = None
@@ -127,6 +129,7 @@ class RDT:
                 ret_S = p.msg_S if (ret_S is None) else ret_S + p.msg_S
                 self.byte_buffer = self.byte_buffer[length:]
             except Exception as e:
+                self.byte_buffer = ''
                 ret_S = "CORRUPT"
                 print ("Exception: "+str(e))
                 corrupt = True
@@ -140,17 +143,19 @@ class RDT:
             print("Packet is corrupt with self.seq_num: "+str(self.seq_num))
             print(byte_S)
             #send a NAK
-            p = Packet(2, self.seq_num, str(self.send_state))       
+            p = Packet(2, self.seq_num, str(self.other_send_state))       
             self.network.udt_send(p.get_byte_S())
             sleep(1)
             return None
         #it's text (new)
         elif(p_type == 0 and p_seq == self.seq_num): 
-            print("New text received, sending ACK and transmittint up to APP layer with p.seq_num: "+str(p_seq)+ " self.seq_num: "+str(self.seq_num))
+            print("New text received, sending ACK and transmitting up to APP layer with p.seq_num: "+str(p_seq)+ " self.seq_num: "+str(self.seq_num))
             #send ACK
             p = Packet(1, self.seq_num, "ACK")       
             self.network.udt_send(p.get_byte_S())
             self.seq_num = 1 if self.seq_num == 0 else 0
+            self.our_send_state = 1 if self.our_send_state == 0 else 0
+            sleep(1)
             #send to APP layer
             return ret_S                          
         #it's text and from previous communication cycle
@@ -159,21 +164,25 @@ class RDT:
             #send another ACK
             p = Packet(1, self.seq_num, "ACK")       
             self.network.udt_send(p.get_byte_S())
+            sleep(1)
             #don't send up to APP layer
             return None                           
         #it's an ACK
         elif(p_type == 1):
             print("ACK received, switching seq num states with p.seq_num: "+str(p_seq)+ " self.seq_num: "+str(self.seq_num))
             self.seq_num= 1 if self.seq_num == 0 else 0
-            self.send_state = 1 if self.send_state == 0 else 0
+            self.other_send_state = 1 if self.other_send_state == 0 else 0
             sleep(1)
             return None
         #it's a NAK, p_type == 2
         else:
-            print("NAK received, retransmitting with p.send_state: "+str(ret_S)+ " self.send_state: "+str(self.send_state))
+            print("NAK received, retransmitting with p.other_send_state: "+str(ret_S)+ " self.our_send_state: "+str(self.our_send_state))
             #send them the old message again
-            if self.send_state == int(ret_S):              
+            if self.our_send_state == int(ret_S): 
+                print("Actually send NAK")
+                self.seq_num = p_seq           
                 self.rdt_2_1_send(self.retransmit_MSG)
+            sleep(1)
             return None
 
     def rdt_3_0_send(self, msg_S):
