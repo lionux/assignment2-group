@@ -2,18 +2,23 @@ import Network
 import argparse
 from time import sleep
 import hashlib
-
+import sys
+import os
 
 class Packet:
     ## the number of bytes used to store packet length
     seq_num_S_length = 10
+    send_state_S_length = 1
+    recv_state_S_length = 1
     length_S_length = 10
     packet_type_length = 1
     ## length of md5 checksum in hex
     checksum_length = 32 
         
-    def __init__(self, packet_type, seq_num, msg_S):
+    def __init__(self, packet_type, send_state, recv_state, seq_num, msg_S):
         self.packet_type = packet_type
+        self.recv_state = recv_state
+        self.send_state = send_state
         self.seq_num = seq_num
         self.msg_S = msg_S
         
@@ -23,22 +28,26 @@ class Packet:
             raise RuntimeError('Cannot initialize Packet: byte_S is corrupt')
         #extract the fields
         packet_type = int(byte_S[Packet.length_S_length: Packet.length_S_length + Packet.packet_type_length])
-        seq_num = int(byte_S[Packet.length_S_length + Packet.packet_type_length : Packet.length_S_length +Packet.packet_type_length +Packet.seq_num_S_length])
-        msg_S = byte_S[Packet.length_S_length+Packet.packet_type_length + Packet.seq_num_S_length+Packet.checksum_length :]
-        return self(packet_type, seq_num, msg_S)
+        send_state = int(byte_S[Packet.length_S_length + Packet.packet_type_length : Packet.length_S_length +Packet.packet_type_length +Packet.send_state_S_length])
+        recv_state = int(byte_S[Packet.length_S_length + Packet.packet_type_length + Packet.send_state_S_length: Packet.length_S_length +Packet.packet_type_length +Packet.send_state_S_length + Packet.recv_state_S_length])
+        seq_num = int(byte_S[Packet.length_S_length + Packet.packet_type_length +Packet.send_state_S_length + Packet.recv_state_S_length: Packet.length_S_length +Packet.packet_type_length +Packet.send_state_S_length + Packet.recv_state_S_length+Packet.seq_num_S_length])
+        msg_S = byte_S[Packet.length_S_length+Packet.packet_type_length + Packet.seq_num_S_length+Packet.send_state_S_length + Packet.recv_state_S_length+Packet.checksum_length :]
+        return self(packet_type, send_state, recv_state, seq_num, msg_S)
         
         
     def get_byte_S(self):
         packet_type_S = str(self.packet_type)
+        send_state_S = str(self.send_state)
+        recv_state_S = str(self.recv_state)
         #convert sequence number of a byte field of seq_num_S_length bytes
         seq_num_S = str(self.seq_num).zfill(self.seq_num_S_length)
         #convert length to a byte field of length_S_length bytes
-        length_S = str(self.length_S_length + len(packet_type_S) + len(seq_num_S) + self.checksum_length + len(self.msg_S)).zfill(self.length_S_length)
+        length_S = str(self.length_S_length + len(packet_type_S) + len(send_state_S) + len(recv_state_S) + len(seq_num_S) + self.checksum_length + len(self.msg_S)).zfill(self.length_S_length)
         #compute the checksum
-        checksum = hashlib.md5((length_S+packet_type_S+seq_num_S+self.msg_S).encode('utf-8'))
+        checksum = hashlib.md5((length_S+packet_type_S+send_state_S+recv_state_S+ seq_num_S+self.msg_S).encode('utf-8'))
         checksum_S = checksum.hexdigest()
         #compile into a string
-        return length_S + packet_type_S + seq_num_S + checksum_S + self.msg_S
+        return length_S + packet_type_S + send_state_S + recv_state_S + seq_num_S + checksum_S + self.msg_S
    
     
     @staticmethod
@@ -46,12 +55,13 @@ class Packet:
         #extract the fields
         length_S = byte_S[0:Packet.length_S_length]
         packet_type_S = byte_S[Packet.length_S_length : Packet.length_S_length + Packet.packet_type_length]
-        seq_num_S = byte_S[Packet.length_S_length +Packet.packet_type_length : Packet.seq_num_S_length+Packet.packet_type_length+Packet.seq_num_S_length]
-        checksum_S = byte_S[Packet.seq_num_S_length+Packet.packet_type_length+Packet.seq_num_S_length : Packet.seq_num_S_length+Packet.packet_type_length+Packet.length_S_length+Packet.checksum_length]
-        msg_S = byte_S[Packet.seq_num_S_length+Packet.packet_type_length+Packet.seq_num_S_length+Packet.checksum_length :]
-        
+        send_state_S = byte_S[Packet.length_S_length + Packet.packet_type_length : Packet.length_S_length + Packet.packet_type_length + Packet.send_state_S_length]
+        recv_state_S = byte_S[Packet.length_S_length + Packet.packet_type_length + Packet.send_state_S_length : Packet.length_S_length + Packet.packet_type_length + Packet.send_state_S_length + Packet.recv_state_S_length]
+        seq_num_S = byte_S[Packet.length_S_length +Packet.packet_type_length+ Packet.send_state_S_length + Packet.recv_state_S_length : Packet.seq_num_S_length+Packet.packet_type_length+ Packet.send_state_S_length + Packet.recv_state_S_length+Packet.seq_num_S_length]
+        checksum_S = byte_S[Packet.seq_num_S_length+Packet.packet_type_length+ Packet.send_state_S_length + Packet.recv_state_S_length+Packet.seq_num_S_length : Packet.seq_num_S_length+Packet.packet_type_length+ Packet.send_state_S_length + Packet.recv_state_S_length+Packet.length_S_length+Packet.checksum_length]
+        msg_S = byte_S[Packet.seq_num_S_length+Packet.packet_type_length+ Packet.send_state_S_length + Packet.recv_state_S_length+Packet.length_S_length+Packet.checksum_length :]
         #compute the checksum locally
-        checksum = hashlib.md5(str(length_S+packet_type_S+seq_num_S+msg_S).encode('utf-8'))
+        checksum = hashlib.md5(str(length_S+packet_type_S+send_state_S+recv_state_S+seq_num_S+msg_S).encode('utf-8'))
         computed_checksum_S = checksum.hexdigest()
         #and check if the same
         return checksum_S != computed_checksum_S
@@ -64,6 +74,8 @@ class RDT:
     #the NAK send state (either 0 or 1), for 2_1
     our_send_state = 0
     other_send_state = 0
+    our_recv_state = 0
+    other_recv_state = 0
     ## buffer of bytes read from network
     byte_buffer = '' 
     retransmit_MSG = '' 
@@ -103,7 +115,7 @@ class RDT:
     
     def rdt_2_1_send(self, msg_S):
         self.retransmit_MSG = msg_S #reassign the retransimit message to the current one
-        p = Packet(0, self.seq_num, msg_S)
+        p = Packet(0, self.our_send_state, self.our_recv_state, self.seq_num, msg_S)
         self.network.udt_send(p.get_byte_S())
         sleep(1)
         
@@ -112,6 +124,8 @@ class RDT:
         byte_S = None
         p_type = None
         p_seq = None
+        p_recv_state = None
+        p_send_state = None
         corrupt = False
         byte_S = self.network.udt_receive()
         #print("RECEIVED PACKET: "+str(byte_S))
@@ -126,12 +140,16 @@ class RDT:
                 p = Packet.from_byte_S(self.byte_buffer[0:length]) 
                 p_type = p.packet_type
                 p_seq = p.seq_num
+                p_recv_state = p.recv_state
+                p_send_state = p.send_state
                 ret_S = p.msg_S if (ret_S is None) else ret_S + p.msg_S
                 self.byte_buffer = self.byte_buffer[length:]
             except Exception as e:
                 self.byte_buffer = ''
                 ret_S = "CORRUPT"
-                print ("Exception: "+str(e))
+                exc_type, exc_obj, exc_tb = sys.exc_info()
+                fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+                print(exc_type, fname, exc_tb.tb_lineno)
                 corrupt = True
                 break
         if ret_S == None:
@@ -143,17 +161,18 @@ class RDT:
             print("Packet is corrupt with self.seq_num: "+str(self.seq_num))
             print(byte_S)
             #send a NAK
-            p = Packet(2, self.seq_num, str(self.other_send_state))       
+            p = Packet(2, self.our_send_state, self.our_recv_state, self.seq_num, "NAK")       
             self.network.udt_send(p.get_byte_S())
             sleep(1)
             return None
         #it's text (new)
         elif(p_type == 0 and p_seq == self.seq_num): 
-            print("New text received, sending ACK and transmitting up to APP layer with p.seq_num: "+str(p_seq)+ " self.seq_num: "+str(self.seq_num))
+            print("New text received, sending ACK and transmitting   up to APP layer with p.seq_num: "+str(p_seq)+ " self.seq_num: "+str(self.seq_num))
             #send ACK
-            p = Packet(1, self.seq_num, "ACK")       
+            p = Packet(1, self.our_send_state, self.our_recv_state, self.seq_num, "ACK")       
             self.network.udt_send(p.get_byte_S())
-            self.seq_num = 1 if self.seq_num == 0 else 0
+            #change both our send and recv states
+            self.our_recv_state = 1 if self.our_recv_state == 0 else 0
             self.our_send_state = 1 if self.our_send_state == 0 else 0
             sleep(1)
             #send to APP layer
@@ -162,7 +181,7 @@ class RDT:
         elif(p_type == 0 and p_seq != self.seq_num): 
             print("Old text received, resending an ACK with p.seq_num: "+str(p_seq)+ " self.seq_num: "+str(self.seq_num))
             #send another ACK
-            p = Packet(1, self.seq_num, "ACK")       
+            p = Packet(1, self.our_send_state, self.our_recv_state, self.seq_num, "ACK")       
             self.network.udt_send(p.get_byte_S())
             sleep(1)
             #don't send up to APP layer
@@ -170,7 +189,7 @@ class RDT:
         #it's an ACK
         elif(p_type == 1):
             print("ACK received, switching seq num states with p.seq_num: "+str(p_seq)+ " self.seq_num: "+str(self.seq_num))
-            self.seq_num= 1 if self.seq_num == 0 else 0
+            self.our_recv_state = 1 if self.our_recv_state == 0 else 0
             self.other_send_state = 1 if self.other_send_state == 0 else 0
             sleep(1)
             return None
@@ -178,10 +197,17 @@ class RDT:
         else:
             print("NAK received, retransmitting with p.other_send_state: "+str(ret_S)+ " self.our_send_state: "+str(self.our_send_state))
             #send them the old message again
-            if self.our_send_state == int(ret_S): 
-                print("Actually send NAK")
-                self.seq_num = p_seq           
+            if self.our_send_state != p_send_state: 
+                print("Don't do anything because it must have been an ACK that was Corrupt")
+                #print("Actually send ACK again")
+                #self.seq_num = p_seq           
+                #p = Packet(1, self.seq_num, "ACK")     
+                #self.udt_send(p.get_byte_S())
+            elif self.our_send_state == p_send_state and self.our_recv_state == p_recv_state:
+                print("Actually send msg agian because seq nums are equal")
+                self.seq_num = p_seq   
                 self.rdt_2_1_send(self.retransmit_MSG)
+
             sleep(1)
             return None
 
