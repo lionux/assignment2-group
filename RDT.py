@@ -156,7 +156,7 @@ class RDT:
             return None
 
         print("----------------NEW PACKET------------------")
-        print("\n\nPACKET: "+str(byte_S)+"\n")
+        print("\nPACKET: "+str(byte_S)+"\n")
         #packet is corrupt
         if corrupt:
             print("Packet is corrupt!")
@@ -185,10 +185,10 @@ class RDT:
         elif(p_type == 0 and p_seq != self.seq_num): 
             print("Old text received, resending an ACK with p_recv_state")
             #send another ACK
-            self.our_send_state = 1
+            self.our_recv_state = 1
             p = Packet(1, self.our_send_state, self.our_recv_state, p_seq, "ACK")  
             self.network.udt_send(p.get_byte_S())
-            self.our_send_state = 0     
+            self.our_recv_state = 0     
             sleep(1)
             #don't send up to APP layer
             return None                           
