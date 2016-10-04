@@ -1,6 +1,7 @@
 import Network
 import argparse
 from time import sleep
+import time
 import hashlib
 import sys
 import os
@@ -77,7 +78,13 @@ class RDT:
     rct_NAK = 0 #set to 1 if a NAK was the last msg sent
     ## buffer of bytes read from network
     byte_buffer = '' 
-    retransmit_MSG = '' 
+    retransmit_MSG = ''
+
+    ## ---- Timeout variables for RDT_3.0 ---- ##
+    # timer stopped if None
+    timer = None
+    # Value must be less than timeout from App layers to avoid... complications.
+    timeout = 4 # assume packet loss after 4 seconds
 
     def __init__(self, role_S, server_S, port):
         self.network = Network.NetworkLayer(role_S, server_S, port)
@@ -117,6 +124,7 @@ class RDT:
         self.retransmit_MSG = msg_S #reassign the retransimit message to the current one
         p = Packet(0, self.our_send_state, self.our_recv_state, self.seq_num, msg_S)
         self.network.udt_send(p.get_byte_S())
+        self.timer = time.time()
         sleep(1)
         
     def rdt_2_1_receive(self):
@@ -178,6 +186,7 @@ class RDT:
             self.network.udt_send(p.get_byte_S())
             #change both our send and recv states
             self.our_recv_state = 0
+            print ("Time needed to receive packet: " + str(int(time.time() - self.timer)))
             sleep(1)
             #send to APP layer
             return ret_S                          
@@ -214,10 +223,119 @@ class RDT:
             return None
 
     def rdt_3_0_send(self, msg_S):
-        pass
-        
+        self.our_send_state = 1
+        self.retransmit_MSG = msg_S  # reassign the retransimit message to the current one
+        p = Packet(0, self.our_send_state, self.our_recv_state, self.seq_num, msg_S)
+        self.network.udt_send(p.get_byte_S())
+        #start timer
+        timer = time.time()
+        sleep(1)
+
+
+    # rdt is just like 2.1 but with a timer.
     def rdt_3_0_receive(self):
-        pass
+        ret_S = None
+        byte_S = None
+        p_type = None
+        p_seq = None
+        p_recv_state = None
+        p_send_state = None
+        corrupt = False
+        byte_S = self.network.udt_receive()
+        self.byte_buffer += byte_S
+        while True:
+            try:
+                if (len(self.byte_buffer) < Packet.length_S_length):
+                    break
+                length = int(self.byte_buffer[:Packet.length_S_length])
+                if len(self.byte_buffer) < length:
+                    break
+                p = Packet.from_byte_S(self.byte_buffer[0:length])
+                p_type = p.packet_type
+                p_seq = p.seq_num
+                p_recv_state = p.recv_state
+                p_send_state = p.send_state
+                ret_S = p.msg_S if (ret_S is None) else ret_S + p.msg_S
+                self.byte_buffer = self.byte_buffer[length:]
+            except Exception as e:
+                self.byte_buffer = ''
+                ret_S = "CORRUPT"
+                exc_type, exc_obj, exc_tb = sys.exc_info()
+                fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+                print(exc_type, fname, exc_tb.tb_lineno)
+                print(e)
+                corrupt = True
+                break
+        if ret_S == None:
+            #Check timeout here
+            if timer is not None and int(time.time() - self.timer) > self.timeout:
+                #resend packet
+                self.rdt_3_0_send(self.retransmit_MSG)
+            return None
+
+        print("----------------NEW PACKET------------------")
+        print("\nPACKET: " + str(byte_S) + "\n")
+        # packet is corrupt
+        if corrupt:
+            print("Packet is corrupt!")
+            # we are sending so they
+            if (self.our_send_state == 1):
+                print("We are in a send state, so we are retransmitting data.")
+                self.rdt_2_1_send(self.retransmit_MSG)
+            else:
+                print("We are in a receive state, so we are sending a NAK.")
+                p = Packet(2, self.our_send_state, self.our_recv_state, self.seq_num, "NAK")
+                self.network.udt_send(p.get_byte_S())
+            sleep(1)
+            return None
+        # it's text (new)
+        elif (p_type == 0 and p_seq == self.seq_num):
+            self.our_recv_state = 1
+            print("New text received, sending ACK and transmitting up to APP layer.")
+            p = Packet(1, self.our_send_state, self.our_recv_state, self.seq_num, "ACK")
+            self.network.udt_send(p.get_byte_S())
+            # change both our send and recv states
+
+            self.our_recv_state = 0
+            sleep(1)
+            # send to APP layer
+            return ret_S
+            # it's text and from previous communication cycle
+        elif (p_type == 0 and p_seq != self.seq_num):
+            print("Old text received, resending an ACK with p_recv_state")
+            # send another ACK
+            self.our_recv_state = 1
+            p = Packet(1, self.our_send_state, self.our_recv_state, p_seq, "ACK")
+            self.network.udt_send(p.get_byte_S())
+            self.our_recv_state = 0
+            sleep(1)
+            # don't send up to APP layer
+            return None
+            # it's an ACK
+        elif (p_type == 1):
+            print("ACK received, stop timer, switching our send state, p_recv_state: " + str(
+                p_recv_state) + " self.our_send_state: " + str(self.our_send_state))
+            self.our_send_state = 0
+
+
+            # !! Still need to extend ACK to deterine the sequence number. If we stop the timer on the wrong ACK, we will lose packets
+            self.timer = None
+            sleep(1)
+            return None
+        # it's a NAK, p_type == 2
+        else:
+            print("NAK received!")
+            if p_seq == self.seq_num:
+                print("Sending data again")
+                self.seq_num = p_seq
+                self.rdt_3_0_send(self.retransmit_MSG)
+            else:
+                print("Sending another ACK")
+                p = Packet(1, self.our_send_state, self.our_recv_state, self.seq_num, "ACK")
+                self.network.udt_send(p.get_byte_S())
+
+            sleep(1)
+            return None
         
 
 if __name__ == '__main__':
