@@ -212,7 +212,7 @@ class RDT:
             else:
                 print("We are in a receive state, so we are sending a NAK.")
                 p = Packet(2, self.our_send_state, self.our_recv_state, self.seq_num, "NAK")
-                self.retransmit_MSG = "NAK"
+                #self.retransmit_MSG = "NAK"
                 self.network.udt_send(p.get_byte_S())
             #sleep(1)
             return None
