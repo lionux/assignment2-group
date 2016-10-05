@@ -206,9 +206,12 @@ class RDT:
                 self.seq_num = p_seq
                 self.rdt_2_1_send(self.retransmit_MSG)
             else:
-                print("Sending another ACK")
-                p = Packet(1, self.our_send_state, self.our_recv_state, self.seq_num, "ACK")       
+                print("Sending another ACK then resend data")
+                p = Packet(1, self.our_send_state, self.our_recv_state, self.seq_num, "ACK")
                 self.network.udt_send(p.get_byte_S())
+                sleep(0.5)
+                self.seq_num = p_seq
+                self.rdt_2_1_send(self.retransmit_MSG)
 
             sleep(1)
             return None
