@@ -148,7 +148,7 @@ class RDT:
         p_send_state = None
         corrupt = False
         byte_S = self.network.udt_receive()
-        self.byte_buffer += byte_S
+        self.byte_buffer = byte_S
         while True:
             try:
                 if(len(self.byte_buffer) < Packet.length_S_length):
