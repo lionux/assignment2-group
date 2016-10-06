@@ -148,7 +148,7 @@ class RDT:
         p_send_state = None
         corrupt = False
         byte_S = self.network.udt_receive()
-        self.byte_buffer = byte_S
+        self.byte_buffer += byte_S
         while True:
             try:
                 if(len(self.byte_buffer) < Packet.length_S_length):
@@ -164,7 +164,7 @@ class RDT:
                 ret_S = p.msg_S if (ret_S is None) else ret_S + p.msg_S
                 self.byte_buffer = self.byte_buffer[length:]
             except Exception as e:
-                self.byte_buffer = ''
+                self.byte_buffer = self.byte_buffer[length+5:]
                 ret_S = "CORRUPT"
                 exc_type, exc_obj, exc_tb = sys.exc_info()
                 fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
