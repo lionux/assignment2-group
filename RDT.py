@@ -171,31 +171,31 @@ class RDT:
                 ret_S = "CORRUPT"
                 exc_type, exc_obj, exc_tb = sys.exc_info()
                 fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-                print(exc_type, fname, exc_tb.tb_lineno)
-                print(e) # remove/comment this out before submitting. It looks ugly in our output and we might lose points for it looking like a run time error.
+                #print(exc_type, fname, exc_tb.tb_lineno)
+                #print(e) # remove/comment this out before submitting. It looks ugly in our output and we might lose points for it looking like a run time error.
                 corrupt = True
                 break
         if ret_S == None:
             return None
 
         print("----------------NEW PACKET------------------")
-        print("\nBUFFER: "+str(byte_S))
-        print("REMAINING PACKETS: " + str(self.byte_buffer))
+        #print("\nBUFFER: "+str(byte_S))
+        #print("REMAINING PACKETS: " + str(self.byte_buffer))
         print("CONTENTS: "+str(ret_S)+"\n")
         #check for appended ACK/NAK response in ret_S and split it. I'm tired of this.
         first, second = Packet.split_ret_s(ret_S)
         if first != ret_S:
-            print ("Found multi-Packet. Splitting")
+            #print ("Found multi-Packet. Splitting")
             if first == "ACK":
                 #switch to receive state
-                print("ACK found inside. Switching states and running the rest of the message through")
+                #print("ACK found inside. Switching states and running the rest of the message through")
                 self.our_send_state = 0
                 ret_S = second
                 p_type = 0
             else: #NAK
                 # resend data
                 self.our_send_state = 0
-                print("Found NAK with message. Assume ACK was sent. Because LOGIC")
+                #print("Found NAK with message. Assume ACK was sent. Because LOGIC")
                 #self.rdt_2_1_send(self.retransmit_MSG)
                 # p = Packet(2, self.our_send_state, self.our_recv_state, self.seq_num, "NAK")
                 # self.network.udt_send(p.get_byte_S())
@@ -205,16 +205,16 @@ class RDT:
 
         #packet is corrupt
         if corrupt: # case 0
-            print("Packet is corrupt!")
+            #print("Packet is corrupt!")
             #we are sending so they 
             if(self.our_send_state == 1):
-                print("We are in a send state, so we send NAK and then retransmit data.")
+                #print("We are in a send state, so we send NAK and then retransmit data.")
                 p = Packet(2, self.our_send_state, self.our_recv_state, self.seq_num, "NAK")
                 self.network.udt_send(p.get_byte_S())
                 #sleep(1)
                 self.rdt_2_1_send(self.retransmit_MSG)
             else:
-                print("We are in a receive state, so we are sending a NAK.")
+                #print("We are in a receive state, so we are sending a NAK.")
                 p = Packet(2, self.our_send_state, self.our_recv_state, self.seq_num, "NAK")
                 #self.retransmit_MSG = "NAK"
                 self.network.udt_send(p.get_byte_S())
@@ -222,7 +222,7 @@ class RDT:
             return None
         #it's text (new)
         elif(p_type == 0 and self.our_send_state == 0): # case 1
-            print("New text received, sending ACK and transmitting up to APP layer")
+            #print("New text received, sending ACK and transmitting up to APP layer")
             p = Packet(1, self.our_send_state, self.our_recv_state, self.seq_num, "ACK")       
             self.network.udt_send(p.get_byte_S())
             #change both our send and recv states
@@ -232,7 +232,7 @@ class RDT:
             return ret_S                          
         #it's text but we're in send  state
         elif(p_type == 0 and self.our_send_state == 1): # case 2
-            print("Premature message received, DROP IT!")
+            #print("Premature message received, DROP IT!")
             # Do Nothing!... okay try something... No that's definitely bad
             # p = Packet(2, self.our_send_state, self.our_recv_state, self.seq_num, "NAK")
             # self.network.udt_send(p.get_byte_S())
@@ -240,18 +240,18 @@ class RDT:
             return None                           
         #it's an ACK
         elif(p_type == 1): # case 3
-            print("ACK received, switching our send state to receive, old self_send_state: "+str(self.our_send_state))
+            #print("ACK received, switching our send state to receive, old self_send_state: "+str(self.our_send_state))
             self.our_send_state = 0
             #sleep(0.5)
             return None
         #it's a NAK, p_type == 2
         else: # case 4
-            print("NAK received!")
+            #print("NAK received!")
             if p_send_state == 0: # Bad message received. retransmit...
-                print("Sending data again")
+                #print("Sending data again")
                 self.rdt_2_1_send(self.retransmit_MSG)
             else:
-                print("Sending another ACK then resend data")
+                #print("Sending another ACK then resend data")
                 p = Packet(1, self.our_send_state, self.our_recv_state, self.seq_num, "ACK")
                 self.network.udt_send(p.get_byte_S())
                 # sleep(1) # half second sleep too short
@@ -268,7 +268,7 @@ class RDT:
 
         #start timer
         self.timer = time.time()
-        sleep(1)
+        #sleep(1)
 
 
     # rdt is just like 2.1 but with a timer.
@@ -304,9 +304,9 @@ class RDT:
                 ret_S = "CORRUPT"
                 exc_type, exc_obj, exc_tb = sys.exc_info()
                 fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-                print(exc_type, fname, exc_tb.tb_lineno)
-                print(
-                    e)  # remove/comment this out before submitting. It looks ugly in our output and we might lose points for it looking like a run time error.
+                #print(exc_type, fname, exc_tb.tb_lineno)
+                #print(
+                    #e)  # remove/comment this out before submitting. It looks ugly in our output and we might lose points for it looking like a run time error.
                 corrupt = True
                 break
         if ret_S == None:
@@ -317,23 +317,23 @@ class RDT:
             return None
 
         print("----------------NEW PACKET------------------")
-        print("\nBUFFER: " + str(byte_S))
-        print("REMAINING PACKETS: " + str(self.byte_buffer))
+        #print("\nBUFFER: " + str(byte_S))
+        #print("REMAINING PACKETS: " + str(self.byte_buffer))
         print("CONTENTS: " + str(ret_S) + "\n")
         # check for appended ACK/NAK response in ret_S and split it. I'm tired of this.
         first, second = Packet.split_ret_s(ret_S)
         if first != ret_S:
-            print("Found multi-Packet. Splitting")
+           # print("Found multi-Packet. Splitting")
             if first == "ACK":
                 # switch to receive state
-                print("ACK found inside. Switching states and running the rest of the message through")
+                #print("ACK found inside. Switching states and running the rest of the message through")
                 self.our_send_state = 0
                 ret_S = second
                 p_type = 0
             else:  # NAK
                 # resend data
                 self.our_send_state = 0
-                print("Found NAK with message. Assume ACK was sent. Because LOGIC")
+                #print("Found NAK with message. Assume ACK was sent. Because LOGIC")
                 # self.rdt_2_1_send(self.retransmit_MSG)
                 # p = Packet(2, self.our_send_state, self.our_recv_state, self.seq_num, "NAK")
                 # self.network.udt_send(p.get_byte_S())
@@ -342,16 +342,16 @@ class RDT:
 
         # packet is corrupt
         if corrupt:  # case 0
-            print("Packet is corrupt!")
+            #print("Packet is corrupt!")
             # we are sending so they
             if (self.our_send_state == 1):
-                print("We are in a send state, so we send NAK and then retransmit data.")
+               # print("We are in a send state, so we send NAK and then retransmit data.")
                 p = Packet(2, self.our_send_state, self.our_recv_state, self.seq_num, "NAK")
                 self.network.udt_send(p.get_byte_S())
                 # sleep(1)
                 self.rdt_2_1_send(self.retransmit_MSG)
             else:
-                print("We are in a receive state, so we are sending a NAK.")
+                #print("We are in a receive state, so we are sending a NAK.")
                 p = Packet(2, self.our_send_state, self.our_recv_state, self.seq_num, "NAK")
                 # self.retransmit_MSG = "NAK"
                 self.network.udt_send(p.get_byte_S())
@@ -359,7 +359,7 @@ class RDT:
             return None
         # it's text (new)
         elif (p_type == 0 and self.our_send_state == 0):  # case 1
-            print("New text received, sending ACK and transmitting up to APP layer")
+            #print("New text received, sending ACK and transmitting up to APP layer")
             p = Packet(1, self.our_send_state, self.our_recv_state, self.seq_num, "ACK")
             self.network.udt_send(p.get_byte_S())
             # change both our send and recv states
@@ -369,27 +369,27 @@ class RDT:
             return ret_S
             # it's text but we're in send  state
         elif (p_type == 0 and self.our_send_state == 1):  # case 2
-            print("Premature message received, DROP IT and send NAK 1")
+            #print("Premature message received, DROP IT and send NAK 1")
             # Do Nothing!... okay try something... No that's definitely bad
-            #p = Packet(2, self.our_send_state, self.our_recv_state, self.seq_num, "NAK")
-            # self.network.udt_send(p.get_byte_S())
+            p = Packet(2, self.our_send_state, self.our_recv_state, self.seq_num, "NAK")
+            self.network.udt_send(p.get_byte_S())
             # sleep(0.5)
             return None
             # it's an ACK
         elif (p_type == 1):  # case 3
-            print("ACK received, switching our send state to receive, old self_send_state: " + str(self.our_send_state))
+            #print("ACK received, switching our send state to receive, old self_send_state: " + str(self.our_send_state))
             self.our_send_state = 0
             self.timer = None
             # sleep(0.5)
             return None
         # it's a NAK, p_type == 2
         else:  # case 4
-            print("NAK received!")
+            #print("NAK received!")
             if p_send_state == 0:  # Bad message received. retransmit...
-                print("Sending data again")
+                #print("Sending data again")
                 self.rdt_2_1_send(self.retransmit_MSG)
             else:
-                print("Sending another ACK then resend data")
+                #print("Sending another ACK then resend data")
                 p = Packet(1, self.our_send_state, self.our_recv_state, self.seq_num, "ACK")
                 self.network.udt_send(p.get_byte_S())
                 # sleep(1) # half second sleep too short
